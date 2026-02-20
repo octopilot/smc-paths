@@ -30,6 +30,9 @@ pub mod aws;
 pub mod azure;
 pub mod gcp;
 
+#[cfg(test)]
+mod tests;
+
 // Core PathBuilder components
 pub mod builder;
 pub mod errors;
