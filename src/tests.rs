@@ -1045,167 +1045,197 @@ mod builder_misc {
 #[cfg(test)]
 mod gcp_functions {
     use crate::gcp::{parameter_manager, secret_manager};
+    use crate::parameters::{LocationId, ParameterName, ProjectId, SecretName, VersionId};
 
-    // ── secret_manager functions ─────────────────────────────────────────────
+    fn p(s: &str) -> ProjectId { ProjectId::new(s) }
+    fn s(s: &str) -> SecretName { SecretName::new(s) }
+    fn v(s: &str) -> VersionId { VersionId::new(s) }
+    fn l(s: &str) -> LocationId { LocationId::new(s) }
+    fn param(s: &str) -> ParameterName { ParameterName::new(s) }
 
     #[test]
     fn create_secret_path() {
-        let p = secret_manager::create_secret("my-project");
-        assert_eq!(p, "/v1/projects/my-project/secrets");
+        let path = secret_manager::create_secret(&p("my-project")).build_pact_path();
+        assert_eq!(path, "/v1/projects/my-project/secrets");
     }
 
     #[test]
     fn get_secret_metadata_path() {
-        let p = secret_manager::get_secret_metadata("proj", "my-secret");
-        assert_eq!(p, "/v1/projects/proj/secrets/my-secret");
+        let path = secret_manager::get_secret_metadata(&p("proj"), &s("my-secret")).build_pact_path();
+        assert_eq!(path, "/v1/projects/proj/secrets/my-secret");
     }
 
     #[test]
     fn add_version_path() {
-        let p = secret_manager::add_version("proj", "s");
-        assert!(p.ends_with(":addVersion"));
-        assert!(p.contains("proj") && p.contains('/'));
+        let path = secret_manager::add_version(&p("proj"), &s("mysecret")).build_pact_path();
+        assert!(path.ends_with(":addVersion"), "got: {path}");
+        assert!(path.contains("proj") && path.contains('/'));
     }
 
     #[test]
     fn list_versions_path() {
-        let p = secret_manager::list_versions("proj", "s");
-        assert!(p.contains("versions") && p.contains("proj"));
+        let path = secret_manager::list_versions(&p("proj"), &s("mysecret")).build_pact_path();
+        assert!(path.contains("versions") && path.contains("proj"));
     }
 
     #[test]
     fn get_version_path() {
-        let p = secret_manager::get_version("proj", "s", "3");
-        assert!(p.ends_with("/3"));
-        assert!(p.contains("versions"));
+        let path = secret_manager::get_version(&p("proj"), &s("mysecret"), &v("3")).build_pact_path();
+        assert!(path.ends_with("/3"), "got: {path}");
+        assert!(path.contains("versions"));
     }
 
     #[test]
     fn access_latest_version_path() {
-        let p = secret_manager::access_latest_version("proj", "s");
-        assert!(p.contains("latest") && p.contains(":access"));
+        let path = secret_manager::access_latest_version(&p("proj"), &s("mysecret")).build_pact_path();
+        assert!(path.contains("latest") && path.contains(":access"));
     }
 
     #[test]
     fn enable_secret_path_contains_action() {
-        let p = secret_manager::enable_secret("proj", "s");
-        assert!(p.contains("enable") || p.contains("Enable"));
+        let path = secret_manager::enable_secret(&p("proj"), &s("mysecret")).build_pact_path();
+        assert!(path.contains("enable") || path.contains("Enable"));
     }
 
     #[test]
     fn disable_secret_path_contains_action() {
-        let p = secret_manager::disable_secret("proj", "s");
-        assert!(p.contains("disable") || p.contains("Disable"));
+        let path = secret_manager::disable_secret(&p("proj"), &s("mysecret")).build_pact_path();
+        assert!(path.contains("disable") || path.contains("Disable"));
     }
-
-    // ── parameter_manager functions ─────────────────────────────────────────
 
     #[test]
     fn get_location_path() {
-        let p = parameter_manager::get_location("proj", "us-central1");
-        assert!(p.contains("us-central1") && p.contains("locations"));
+        let path = parameter_manager::get_location(&p("proj"), &l("us-central1")).build_pact_path();
+        assert!(path.contains("us-central1") && path.contains("locations"));
     }
 
     #[test]
     fn list_locations_path() {
-        let p = parameter_manager::list_locations("proj");
-        assert!(p.contains("locations") && p.contains("proj"));
+        let path = parameter_manager::list_locations(&p("proj")).build_pact_path();
+        assert!(path.contains("locations") && path.contains("proj"));
     }
 
     #[test]
     fn get_parameter_path() {
-        let p = parameter_manager::get_parameter("proj", "us-east1", "my-param");
-        assert!(p.contains("my-param") && p.contains("us-east1"));
+        let path = parameter_manager::get_parameter(&p("proj"), &l("us-east1"), &param("my-param")).build_pact_path();
+        assert!(path.contains("my-param") && path.contains("us-east1"));
     }
 
     #[test]
     fn render_version_path() {
-        let p = parameter_manager::render_version("proj", "us-central1", "param", "v1");
-        assert!(p.contains(":render") || p.contains("render"));
-        assert!(p.contains("v1"));
+        let path = parameter_manager::render_version(&p("proj"), &l("us-central1"), &param("par"), &v("v1")).build_pact_path();
+        assert!(path.contains(":render") || path.contains("render"), "got: {path}");
+        assert!(path.contains("v1"));
+    }
+
+    // ── Route format returns template (no real values) ──────────────────────
+
+    #[test]
+    fn create_secret_route_returns_template() {
+        let route = secret_manager::create_secret(&p("proj")).build_route();
+        // Route must be the URI template — placeholder present, not the actual value.
+        assert_eq!(route, "/v1/projects/{project}/secrets");
+        assert!(route.contains("{project}"));
+        // The concrete value "proj" happens to be a substring of the literal word
+        // "projects" in the template, which is fine — what matters is that the
+        // placeholder is correct, not that the string "proj" is absent.
+    }
+
+    #[test]
+    fn get_secret_route_no_collision_with_short_values() {
+        // "s" is a substring of "secrets" — TypedPath must not corrupt the template
+        let route = secret_manager::get_secret_metadata(&p("p"), &s("s")).build_route();
+        assert_eq!(route, "/v1/projects/{project}/secrets/{secret}");
     }
 }
 
 #[cfg(test)]
 mod azure_functions {
     use crate::azure::{app_configuration as ac, key_vault as kv};
+    use crate::parameters::{SecretName, VersionId};
+
+    fn n(s: &str) -> SecretName { SecretName::new(s) }
+    fn ver(s: &str) -> VersionId { VersionId::new(s) }
+
+    fn pact(p: crate::typed_path::TypedPath) -> String { p.build_pact_path() }
 
     #[test]
     fn kv_get_secret_path() {
-        let p = kv::get_secret("my-secret");
-        assert!(p.contains("my-secret"));
+        assert!(pact(kv::get_secret(&n("my-secret"))).contains("my-secret"));
     }
 
     #[test]
     fn kv_get_secret_version_path() {
-        let p = kv::get_secret_version("my-secret", "abc");
+        let p = pact(kv::get_secret_version(&n("my-secret"), &ver("abc")));
         assert!(p.contains("my-secret") && p.contains("abc"));
     }
 
     #[test]
     fn kv_list_secret_versions_path() {
-        let p = kv::list_secret_versions("my-secret");
-        assert!(p.contains("my-secret"));
+        assert!(pact(kv::list_secret_versions(&n("my-secret"))).contains("my-secret"));
     }
 
     #[test]
     fn kv_set_secret_path() {
-        let p = kv::set_secret("my-secret");
-        assert!(p.contains("my-secret"));
+        assert!(pact(kv::set_secret(&n("my-secret"))).contains("my-secret"));
     }
 
     #[test]
     fn kv_delete_secret_path() {
-        let p = kv::delete_secret("my-secret");
-        assert!(p.contains("my-secret"));
+        assert!(pact(kv::delete_secret(&n("my-secret"))).contains("my-secret"));
     }
 
     #[test]
     fn kv_update_secret_path() {
-        let p = kv::update_secret("my-secret");
-        assert!(p.contains("my-secret"));
+        assert!(pact(kv::update_secret(&n("my-secret"))).contains("my-secret"));
     }
 
     #[test]
     fn kv_backup_secret_path() {
-        let p = kv::backup_secret("my-secret");
+        let p = pact(kv::backup_secret(&n("my-secret")));
         assert!(p.contains("my-secret") && p.contains("backup"));
     }
 
     #[test]
     fn kv_get_deleted_secret_path() {
-        let p = kv::get_deleted_secret("my-secret");
+        let p = pact(kv::get_deleted_secret(&n("my-secret")));
         assert!(p.contains("my-secret") && (p.contains("deleted") || p.contains("Deleted")));
     }
 
     #[test]
     fn kv_recover_deleted_secret_path() {
-        let p = kv::recover_deleted_secret("my-secret");
+        let p = pact(kv::recover_deleted_secret(&n("my-secret")));
         assert!(p.contains("my-secret") && p.contains("recover"));
     }
 
     #[test]
     fn kv_purge_deleted_secret_path() {
-        let p = kv::purge_deleted_secret("my-secret");
-        assert!(p.contains("my-secret"));
+        assert!(pact(kv::purge_deleted_secret(&n("my-secret"))).contains("my-secret"));
     }
 
     #[test]
     fn ac_get_key_value_path() {
-        let p = ac::get_key_value("my-key");
-        assert!(p.contains("my-key"));
+        assert!(pact(ac::get_key_value(&n("my-key"))).contains("my-key"));
     }
 
     #[test]
     fn ac_set_key_value_path() {
-        let p = ac::set_key_value("my-key");
-        assert!(p.contains("my-key"));
+        assert!(pact(ac::set_key_value(&n("my-key"))).contains("my-key"));
     }
 
     #[test]
     fn ac_delete_key_value_path() {
-        let p = ac::delete_key_value("my-key");
-        assert!(p.contains("my-key"));
+        assert!(pact(ac::delete_key_value(&n("my-key"))).contains("my-key"));
+    }
+
+    // ── Route format returns templates ──────────────────────────────────────
+
+    #[test]
+    fn kv_set_secret_route_uses_placeholder() {
+        let route = kv::set_secret(&n("my-secret")).build_route();
+        // Template must have placeholder, not the actual value
+        assert!(route.contains("{secret}"), "got: {route}");
+        assert!(!route.contains("my-secret"));
     }
 }
 

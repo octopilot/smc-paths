@@ -1,271 +1,298 @@
 //! GCP Secret Manager and Parameter Manager API Paths
 //!
-//! This module defines all API paths as constants to ensure consistency
-//! between the controller and mock server implementations.
-//!
-//! These paths are based on the official GCP Secret Manager REST API v1 documentation:
-//! https://cloud.google.com/secret-manager/docs/reference/rest
-//!
-//! **IMPORTANT**: The mock server paths are the source of truth as they were
-//! built directly from the GCP documentation.
+//! Path functions now accept typed parameters ([`ProjectId`], [`SecretName`], etc.)
+//! and return [`TypedPath`] so every output format is derived without `str::replace`.
+
+use crate::parameters::{LocationId, ParameterName, ProjectId, SecretName, VersionId};
+use crate::typed_path::TypedPath;
 
 /// GCP Secret Manager API paths
 pub mod secret_manager {
-    /// Base path for Secret Manager operations
+    use super::*;
+
+    /// Base route template for Secret Manager operations.
     pub const BASE: &str = "/v1/projects/{project}/secrets";
 
-    /// Create a new secret
-    /// POST /v1/projects/{project}/secrets
-    pub fn create_secret(project: &str) -> String {
-        format!("/v1/projects/{project}/secrets")
+    /// `POST /v1/projects/{project}/secrets`
+    pub fn create_secret(project: &ProjectId) -> TypedPath {
+        TypedPath::new("/v1/projects/{project}/secrets").bind("project", project.as_str())
     }
 
-    /// List secrets in a project
-    /// GET /v1/projects/{project}/secrets
-    pub fn list_secrets(project: &str) -> String {
-        format!("/v1/projects/{project}/secrets")
+    /// `GET /v1/projects/{project}/secrets`
+    pub fn list_secrets(project: &ProjectId) -> TypedPath {
+        create_secret(project) // same path, different HTTP method
     }
 
-    /// Get secret metadata
-    /// GET /v1/projects/{project}/secrets/{secret}
-    pub fn get_secret_metadata(project: &str, secret: &str) -> String {
-        format!("/v1/projects/{project}/secrets/{secret}")
+    /// `GET /v1/projects/{project}/secrets/{secret}`
+    pub fn get_secret_metadata(project: &ProjectId, secret: &SecretName) -> TypedPath {
+        TypedPath::new("/v1/projects/{project}/secrets/{secret}")
+            .bind("project", project.as_str())
+            .bind("secret", secret.as_str())
     }
 
-    /// Update secret metadata
-    /// PATCH /v1/projects/{project}/secrets/{secret}
-    pub fn update_secret_metadata(project: &str, secret: &str) -> String {
-        format!("/v1/projects/{project}/secrets/{secret}")
+    /// `PATCH /v1/projects/{project}/secrets/{secret}`
+    pub fn update_secret_metadata(project: &ProjectId, secret: &SecretName) -> TypedPath {
+        get_secret_metadata(project, secret)
     }
 
-    /// Delete a secret
-    /// DELETE /v1/projects/{project}/secrets/{secret}
-    pub fn delete_secret(project: &str, secret: &str) -> String {
-        format!("/v1/projects/{project}/secrets/{secret}")
+    /// `DELETE /v1/projects/{project}/secrets/{secret}`
+    pub fn delete_secret(project: &ProjectId, secret: &SecretName) -> TypedPath {
+        get_secret_metadata(project, secret)
     }
 
-    /// Add a new version to a secret
-    /// POST /v1/projects/{project}/secrets/{secret}:addVersion
-    pub fn add_version(project: &str, secret: &str) -> String {
-        format!("/v1/projects/{project}/secrets/{secret}:addVersion")
+    /// `POST /v1/projects/{project}/secrets/{secret}:addVersion`
+    pub fn add_version(project: &ProjectId, secret: &SecretName) -> TypedPath {
+        TypedPath::new("/v1/projects/{project}/secrets/{secret}:addVersion")
+            .bind("project", project.as_str())
+            .bind("secret", secret.as_str())
     }
 
-    /// Enable a secret
-    /// POST /v1/projects/{project}/secrets/{secret}:enable
-    pub fn enable_secret(project: &str, secret: &str) -> String {
-        format!("/v1/projects/{project}/secrets/{secret}:enable")
+    /// `POST /v1/projects/{project}/secrets/{secret}:enable`
+    pub fn enable_secret(project: &ProjectId, secret: &SecretName) -> TypedPath {
+        TypedPath::new("/v1/projects/{project}/secrets/{secret}:enable")
+            .bind("project", project.as_str())
+            .bind("secret", secret.as_str())
     }
 
-    /// Disable a secret
-    /// POST /v1/projects/{project}/secrets/{secret}:disable
-    pub fn disable_secret(project: &str, secret: &str) -> String {
-        format!("/v1/projects/{project}/secrets/{secret}:disable")
+    /// `POST /v1/projects/{project}/secrets/{secret}:disable`
+    pub fn disable_secret(project: &ProjectId, secret: &SecretName) -> TypedPath {
+        TypedPath::new("/v1/projects/{project}/secrets/{secret}:disable")
+            .bind("project", project.as_str())
+            .bind("secret", secret.as_str())
     }
 
-    /// List versions of a secret
-    /// GET /v1/projects/{project}/secrets/{secret}/versions
-    pub fn list_versions(project: &str, secret: &str) -> String {
-        format!("/v1/projects/{project}/secrets/{secret}/versions")
+    /// `GET /v1/projects/{project}/secrets/{secret}/versions`
+    pub fn list_versions(project: &ProjectId, secret: &SecretName) -> TypedPath {
+        TypedPath::new("/v1/projects/{project}/secrets/{secret}/versions")
+            .bind("project", project.as_str())
+            .bind("secret", secret.as_str())
     }
 
-    /// Get a specific version of a secret
-    /// GET /v1/projects/{project}/secrets/{secret}/versions/{version}
-    pub fn get_version(project: &str, secret: &str, version: &str) -> String {
-        format!("/v1/projects/{project}/secrets/{secret}/versions/{version}")
+    /// `GET /v1/projects/{project}/secrets/{secret}/versions/{version}`
+    pub fn get_version(
+        project: &ProjectId,
+        secret: &SecretName,
+        version: &VersionId,
+    ) -> TypedPath {
+        TypedPath::new("/v1/projects/{project}/secrets/{secret}/versions/{version}")
+            .bind("project", project.as_str())
+            .bind("secret", secret.as_str())
+            .bind("version", version.as_str())
     }
 
-    /// Access latest version (get secret value)
-    /// GET /v1/projects/{project}/secrets/{secret}/versions/latest:access
-    pub fn access_latest_version(project: &str, secret: &str) -> String {
-        format!("/v1/projects/{project}/secrets/{secret}/versions/latest:access")
+    /// `GET /v1/projects/{project}/secrets/{secret}/versions/latest:access`
+    pub fn access_latest_version(project: &ProjectId, secret: &SecretName) -> TypedPath {
+        TypedPath::new("/v1/projects/{project}/secrets/{secret}/versions/latest:access")
+            .bind("project", project.as_str())
+            .bind("secret", secret.as_str())
     }
 
-    /// Access specific version (get secret value)
-    /// GET /v1/projects/{project}/secrets/{secret}/versions/{version}:access
-    pub fn access_version(project: &str, secret: &str, version: &str) -> String {
-        format!("/v1/projects/{project}/secrets/{secret}/versions/{version}:access")
+    /// `GET /v1/projects/{project}/secrets/{secret}/versions/{version}:access`
+    pub fn access_version(
+        project: &ProjectId,
+        secret: &SecretName,
+        version: &VersionId,
+    ) -> TypedPath {
+        TypedPath::new("/v1/projects/{project}/secrets/{secret}/versions/{version}:access")
+            .bind("project", project.as_str())
+            .bind("secret", secret.as_str())
+            .bind("version", version.as_str())
     }
 
-    /// Path template for controller use (without /v1 prefix, as controller adds it)
-    /// Returns: projects/{project}/secrets/{secret}
-    pub fn secret_path(project: &str, secret: &str) -> String {
-        format!("projects/{project}/secrets/{secret}")
+    // ── Controller-style helpers (no /v1/ prefix) ─────────────────────────────
+
+    /// `projects/{project}/secrets/{secret}` (no `/v1/` prefix, controller style)
+    pub fn secret_path(project: &ProjectId, secret: &SecretName) -> TypedPath {
+        TypedPath::new("projects/{project}/secrets/{secret}")
+            .bind("project", project.as_str())
+            .bind("secret", secret.as_str())
     }
 
-    /// Path template for controller use (without /v1 prefix)
-    /// Returns: projects/{project}/secrets
-    pub fn secrets_base(project: &str) -> String {
-        format!("projects/{project}/secrets")
+    /// `projects/{project}/secrets` (no `/v1/` prefix, controller style)
+    pub fn secrets_base(project: &ProjectId) -> TypedPath {
+        TypedPath::new("projects/{project}/secrets").bind("project", project.as_str())
     }
 
-    /// Path template for controller use (without /v1 prefix)
-    /// Returns: projects/{project}/secrets/{secret}:addVersion
-    pub fn add_version_path(project: &str, secret: &str) -> String {
-        format!("projects/{project}/secrets/{secret}:addVersion")
+    /// `projects/{project}/secrets/{secret}:addVersion` (no `/v1/` prefix)
+    pub fn add_version_path(project: &ProjectId, secret: &SecretName) -> TypedPath {
+        TypedPath::new("projects/{project}/secrets/{secret}:addVersion")
+            .bind("project", project.as_str())
+            .bind("secret", secret.as_str())
     }
 
-    /// Path template for controller use (without /v1 prefix)
-    /// Returns: projects/{project}/secrets/{secret}/versions/latest:access
-    pub fn access_latest_version_path(project: &str, secret: &str) -> String {
-        format!("projects/{project}/secrets/{secret}/versions/latest:access")
+    /// `projects/{project}/secrets/{secret}/versions/latest:access` (no `/v1/` prefix)
+    pub fn access_latest_version_path(project: &ProjectId, secret: &SecretName) -> TypedPath {
+        TypedPath::new("projects/{project}/secrets/{secret}/versions/latest:access")
+            .bind("project", project.as_str())
+            .bind("secret", secret.as_str())
     }
 
-    /// Path template for controller use (without /v1 prefix)
-    /// Returns: projects/{project}/secrets/{secret}:enable
-    pub fn enable_secret_path(project: &str, secret: &str) -> String {
-        format!("projects/{project}/secrets/{secret}:enable")
+    /// `projects/{project}/secrets/{secret}:enable` (no `/v1/` prefix)
+    pub fn enable_secret_path(project: &ProjectId, secret: &SecretName) -> TypedPath {
+        TypedPath::new("projects/{project}/secrets/{secret}:enable")
+            .bind("project", project.as_str())
+            .bind("secret", secret.as_str())
     }
 
-    /// Path template for controller use (without /v1 prefix)
-    /// Returns: projects/{project}/secrets/{secret}:disable
-    pub fn disable_secret_path(project: &str, secret: &str) -> String {
-        format!("projects/{project}/secrets/{secret}:disable")
+    /// `projects/{project}/secrets/{secret}:disable` (no `/v1/` prefix)
+    pub fn disable_secret_path(project: &ProjectId, secret: &SecretName) -> TypedPath {
+        TypedPath::new("projects/{project}/secrets/{secret}:disable")
+            .bind("project", project.as_str())
+            .bind("secret", secret.as_str())
     }
 }
 
 /// GCP Parameter Manager API paths
 pub mod parameter_manager {
-    /// Create a new parameter
-    /// POST /v1/projects/{project}/locations/{location}/parameters
-    pub fn create_parameter(project: &str, location: &str) -> String {
-        format!("/v1/projects/{project}/locations/{location}/parameters")
+    use super::*;
+
+    /// `POST /v1/projects/{project}/locations/{location}/parameters`
+    pub fn create_parameter(project: &ProjectId, location: &LocationId) -> TypedPath {
+        TypedPath::new("/v1/projects/{project}/locations/{location}/parameters")
+            .bind("project", project.as_str())
+            .bind("location", location.as_str())
     }
 
-    /// List parameters
-    /// GET /v1/projects/{project}/locations/{location}/parameters
-    pub fn list_parameters(project: &str, location: &str) -> String {
-        format!("/v1/projects/{project}/locations/{location}/parameters")
+    /// `GET /v1/projects/{project}/locations/{location}/parameters`
+    pub fn list_parameters(project: &ProjectId, location: &LocationId) -> TypedPath {
+        create_parameter(project, location)
     }
 
-    /// Get parameter
-    /// GET /v1/projects/{project}/locations/{location}/parameters/{parameter}
-    pub fn get_parameter(project: &str, location: &str, parameter: &str) -> String {
-        format!("/v1/projects/{project}/locations/{location}/parameters/{parameter}")
+    /// `GET /v1/projects/{project}/locations/{location}/parameters/{parameter}`
+    pub fn get_parameter(
+        project: &ProjectId,
+        location: &LocationId,
+        parameter: &ParameterName,
+    ) -> TypedPath {
+        TypedPath::new("/v1/projects/{project}/locations/{location}/parameters/{parameter}")
+            .bind("project", project.as_str())
+            .bind("location", location.as_str())
+            .bind("parameter", parameter.as_str())
     }
 
-    /// Update parameter
-    /// PATCH /v1/projects/{project}/locations/{location}/parameters/{parameter}
-    pub fn update_parameter(project: &str, location: &str, parameter: &str) -> String {
-        format!("/v1/projects/{project}/locations/{location}/parameters/{parameter}")
+    /// `PATCH /v1/projects/{project}/locations/{location}/parameters/{parameter}`
+    pub fn update_parameter(
+        project: &ProjectId,
+        location: &LocationId,
+        parameter: &ParameterName,
+    ) -> TypedPath {
+        get_parameter(project, location, parameter)
     }
 
-    /// Delete parameter
-    /// DELETE /v1/projects/{project}/locations/{location}/parameters/{parameter}
-    pub fn delete_parameter(project: &str, location: &str, parameter: &str) -> String {
-        format!("/v1/projects/{project}/locations/{location}/parameters/{parameter}")
+    /// `DELETE /v1/projects/{project}/locations/{location}/parameters/{parameter}`
+    pub fn delete_parameter(
+        project: &ProjectId,
+        location: &LocationId,
+        parameter: &ParameterName,
+    ) -> TypedPath {
+        get_parameter(project, location, parameter)
     }
 
-    /// Create parameter version
-    /// POST /v1/projects/{project}/locations/{location}/parameters/{parameter}/versions
-    pub fn create_version(project: &str, location: &str, parameter: &str) -> String {
-        format!("/v1/projects/{project}/locations/{location}/parameters/{parameter}/versions")
-    }
-
-    /// List parameter versions
-    /// GET /v1/projects/{project}/locations/{location}/parameters/{parameter}/versions
-    pub fn list_versions(project: &str, location: &str, parameter: &str) -> String {
-        format!("/v1/projects/{project}/locations/{location}/parameters/{parameter}/versions")
-    }
-
-    /// Get parameter version
-    /// GET /v1/projects/{project}/locations/{location}/parameters/{parameter}/versions/{version}
-    pub fn get_version(project: &str, location: &str, parameter: &str, version: &str) -> String {
-        format!(
-            "/v1/projects/{project}/locations/{location}/parameters/{parameter}/versions/{version}"
+    /// `POST /v1/projects/{project}/locations/{location}/parameters/{parameter}/versions`
+    pub fn create_version(
+        project: &ProjectId,
+        location: &LocationId,
+        parameter: &ParameterName,
+    ) -> TypedPath {
+        TypedPath::new(
+            "/v1/projects/{project}/locations/{location}/parameters/{parameter}/versions",
         )
+        .bind("project", project.as_str())
+        .bind("location", location.as_str())
+        .bind("parameter", parameter.as_str())
     }
 
-    /// Update parameter version
-    /// PATCH /v1/projects/{project}/locations/{location}/parameters/{parameter}/versions/{version}
-    pub fn update_version(project: &str, location: &str, parameter: &str, version: &str) -> String {
-        format!(
-            "/v1/projects/{project}/locations/{location}/parameters/{parameter}/versions/{version}"
-        )
+    /// `GET /v1/projects/{project}/locations/{location}/parameters/{parameter}/versions`
+    pub fn list_versions(
+        project: &ProjectId,
+        location: &LocationId,
+        parameter: &ParameterName,
+    ) -> TypedPath {
+        create_version(project, location, parameter)
     }
 
-    /// Delete parameter version
-    /// DELETE /v1/projects/{project}/locations/{location}/parameters/{parameter}/versions/{version}
-    pub fn delete_version(project: &str, location: &str, parameter: &str, version: &str) -> String {
-        format!(
-            "/v1/projects/{project}/locations/{location}/parameters/{parameter}/versions/{version}"
-        )
+    /// `GET /v1/…/parameters/{parameter}/versions/{version}`
+    pub fn get_version(
+        project: &ProjectId,
+        location: &LocationId,
+        parameter: &ParameterName,
+        version: &VersionId,
+    ) -> TypedPath {
+        TypedPath::new("/v1/projects/{project}/locations/{location}/parameters/{parameter}/versions/{version}")
+            .bind("project",   project.as_str())
+            .bind("location",  location.as_str())
+            .bind("parameter", parameter.as_str())
+            .bind("version",   version.as_str())
     }
 
-    /// Render parameter version
-    /// GET /v1/projects/{project}/locations/{location}/parameters/{parameter}/versions/{version}:render
-    pub fn render_version(project: &str, location: &str, parameter: &str, version: &str) -> String {
-        format!(
-            "/v1/projects/{project}/locations/{location}/parameters/{parameter}/versions/{version}:render"
-        )
+    /// `PATCH /v1/…/parameters/{parameter}/versions/{version}`
+    pub fn update_version(
+        project: &ProjectId,
+        location: &LocationId,
+        parameter: &ParameterName,
+        version: &VersionId,
+    ) -> TypedPath {
+        get_version(project, location, parameter, version)
     }
 
-    /// Get location
-    /// GET /v1/projects/{project}/locations/{location}
-    pub fn get_location(project: &str, location: &str) -> String {
-        format!("/v1/projects/{project}/locations/{location}")
+    /// `DELETE /v1/…/parameters/{parameter}/versions/{version}`
+    pub fn delete_version(
+        project: &ProjectId,
+        location: &LocationId,
+        parameter: &ParameterName,
+        version: &VersionId,
+    ) -> TypedPath {
+        get_version(project, location, parameter, version)
     }
 
-    /// List locations
-    /// GET /v1/projects/{project}/locations
-    pub fn list_locations(project: &str) -> String {
-        format!("/v1/projects/{project}/locations")
+    /// `GET /v1/…/parameters/{parameter}/versions/{version}:render`
+    pub fn render_version(
+        project: &ProjectId,
+        location: &LocationId,
+        parameter: &ParameterName,
+        version: &VersionId,
+    ) -> TypedPath {
+        TypedPath::new("/v1/projects/{project}/locations/{location}/parameters/{parameter}/versions/{version}:render")
+            .bind("project",   project.as_str())
+            .bind("location",  location.as_str())
+            .bind("parameter", parameter.as_str())
+            .bind("version",   version.as_str())
+    }
+
+    /// `GET /v1/projects/{project}/locations/{location}`
+    pub fn get_location(project: &ProjectId, location: &LocationId) -> TypedPath {
+        TypedPath::new("/v1/projects/{project}/locations/{location}")
+            .bind("project", project.as_str())
+            .bind("location", location.as_str())
+    }
+
+    /// `GET /v1/projects/{project}/locations`
+    pub fn list_locations(project: &ProjectId) -> TypedPath {
+        TypedPath::new("/v1/projects/{project}/locations").bind("project", project.as_str())
     }
 }
 
-/// Route constants for Axum routes
-///
-/// These constants are the single source of truth for Axum route patterns.
-/// They are validated against PathBuilder output in tests to ensure consistency.
+/// Route constants (URI templates) for Axum — unchanged from before.
 pub mod routes {
-    /// GCP Secret Manager route patterns
     pub mod secret_manager {
-        /// POST /v1/projects/{project}/secrets - Create secret
-        /// GET /v1/projects/{project}/secrets - List secrets
         pub const CREATE_SECRET: &str = "/v1/projects/{project}/secrets";
-
-        /// GET /v1/projects/{project}/secrets/{secret} - Get secret metadata
-        /// PATCH /v1/projects/{project}/secrets/{secret} - Update secret metadata
-        /// DELETE /v1/projects/{project}/secrets/{secret} - Delete secret
         pub const SECRET: &str = "/v1/projects/{project}/secrets/{secret}";
-
-        /// GET /v1/projects/{project}/secrets/{secret}/versions - List secret versions
         pub const SECRET_VERSIONS: &str = "/v1/projects/{project}/secrets/{secret}/versions";
-
-        /// GET /v1/projects/{project}/secrets/{secret}/versions/{version} - Get specific version
         pub const SECRET_VERSION: &str =
             "/v1/projects/{project}/secrets/{secret}/versions/{version}";
     }
-
-    /// GCP Parameter Manager route patterns
     pub mod parameter_manager {
-        /// POST /v1/projects/{project}/locations/{location}/parameters - Create parameter
-        /// GET /v1/projects/{project}/locations/{location}/parameters - List parameters
-        pub const CREATE_PARAMETER: &str = "/v1/projects/{project}/locations/{location}/parameters";
-
-        /// GET /v1/projects/{project}/locations/{location}/parameters/{parameter} - Get parameter
-        /// PATCH /v1/projects/{project}/locations/{location}/parameters/{parameter} - Update parameter
-        /// DELETE /v1/projects/{project}/locations/{location}/parameters/{parameter} - Delete parameter
+        pub const CREATE_PARAMETER: &str =
+            "/v1/projects/{project}/locations/{location}/parameters";
         pub const PARAMETER: &str =
             "/v1/projects/{project}/locations/{location}/parameters/{parameter}";
-
-        /// POST /v1/projects/{project}/locations/{location}/parameters/{parameter}/versions - Create parameter version
-        /// GET /v1/projects/{project}/locations/{location}/parameters/{parameter}/versions - List parameter versions
         pub const PARAMETER_VERSIONS: &str =
             "/v1/projects/{project}/locations/{location}/parameters/{parameter}/versions";
-
-        /// GET /v1/projects/{project}/locations/{location}/parameters/{parameter}/versions/{version} - Get specific parameter version
-        /// PATCH /v1/projects/{project}/locations/{location}/parameters/{parameter}/versions/{version} - Update parameter version
-        /// DELETE /v1/projects/{project}/locations/{location}/parameters/{parameter}/versions/{version} - Delete parameter version
         pub const PARAMETER_VERSION: &str =
             "/v1/projects/{project}/locations/{location}/parameters/{parameter}/versions/{version}";
     }
-
-    /// GCP Location route patterns
     pub mod locations {
-        /// GET /v1/projects/{project}/locations/{location} - Get location
         pub const LOCATION: &str = "/v1/projects/{project}/locations/{location}";
-
-        /// GET /v1/projects/{project}/locations - List locations
         pub const LIST_LOCATIONS: &str = "/v1/projects/{project}/locations";
     }
 }
@@ -278,103 +305,106 @@ mod route_validation {
 
     #[test]
     fn validate_secret_manager_routes() {
-        // Validate CREATE_SECRET route
-        let route = PathBuilder::new()
-            .gcp_operation(GcpOperation::CreateSecret)
-            .project("test-project")
-            .build_route()
-            .unwrap();
-        assert_eq!(route, routes::secret_manager::CREATE_SECRET);
-
-        // Validate SECRET route
-        let route = PathBuilder::new()
-            .gcp_operation(GcpOperation::GetSecret)
-            .project("test-project")
-            .secret("test-secret")
-            .build_route()
-            .unwrap();
-        assert_eq!(route, routes::secret_manager::SECRET);
-
-        // Validate SECRET_VERSIONS route
-        let route = PathBuilder::new()
-            .gcp_operation(GcpOperation::ListVersions)
-            .project("test-project")
-            .secret("test-secret")
-            .build_route()
-            .unwrap();
-        assert_eq!(route, routes::secret_manager::SECRET_VERSIONS);
-
-        // Validate SECRET_VERSION route
-        let route = PathBuilder::new()
-            .gcp_operation(GcpOperation::GetVersion)
-            .project("test-project")
-            .secret("test-secret")
-            .version("123")
-            .build_route()
-            .unwrap();
-        assert_eq!(route, routes::secret_manager::SECRET_VERSION);
+        assert_eq!(
+            PathBuilder::new()
+                .gcp_operation(GcpOperation::CreateSecret)
+                .project("test-project")
+                .build_route()
+                .unwrap(),
+            routes::secret_manager::CREATE_SECRET
+        );
+        assert_eq!(
+            PathBuilder::new()
+                .gcp_operation(GcpOperation::GetSecret)
+                .project("test-project")
+                .secret("test-secret")
+                .build_route()
+                .unwrap(),
+            routes::secret_manager::SECRET
+        );
+        assert_eq!(
+            PathBuilder::new()
+                .gcp_operation(GcpOperation::ListVersions)
+                .project("test-project")
+                .secret("test-secret")
+                .build_route()
+                .unwrap(),
+            routes::secret_manager::SECRET_VERSIONS
+        );
+        assert_eq!(
+            PathBuilder::new()
+                .gcp_operation(GcpOperation::GetVersion)
+                .project("test-project")
+                .secret("test-secret")
+                .version("123")
+                .build_route()
+                .unwrap(),
+            routes::secret_manager::SECRET_VERSION
+        );
     }
 
     #[test]
     fn validate_parameter_manager_routes() {
-        // Validate CREATE_PARAMETER route
-        let route = PathBuilder::new()
-            .gcp_operation(GcpOperation::CreateParameter)
-            .project("test-project")
-            .location("us-central1")
-            .build_route()
-            .unwrap();
-        assert_eq!(route, routes::parameter_manager::CREATE_PARAMETER);
-
-        // Validate PARAMETER route
-        let route = PathBuilder::new()
-            .gcp_operation(GcpOperation::GetParameter)
-            .project("test-project")
-            .location("us-central1")
-            .parameter("test-parameter")
-            .build_route()
-            .unwrap();
-        assert_eq!(route, routes::parameter_manager::PARAMETER);
-
-        // Validate PARAMETER_VERSIONS route
-        let route = PathBuilder::new()
-            .gcp_operation(GcpOperation::ListParameterVersions)
-            .project("test-project")
-            .location("us-central1")
-            .parameter("test-parameter")
-            .build_route()
-            .unwrap();
-        assert_eq!(route, routes::parameter_manager::PARAMETER_VERSIONS);
-
-        // Validate PARAMETER_VERSION route
-        let route = PathBuilder::new()
-            .gcp_operation(GcpOperation::GetParameterVersion)
-            .project("test-project")
-            .location("us-central1")
-            .parameter("test-parameter")
-            .version("123")
-            .build_route()
-            .unwrap();
-        assert_eq!(route, routes::parameter_manager::PARAMETER_VERSION);
+        assert_eq!(
+            PathBuilder::new()
+                .gcp_operation(GcpOperation::CreateParameter)
+                .project("test-project")
+                .location("us-central1")
+                .build_route()
+                .unwrap(),
+            routes::parameter_manager::CREATE_PARAMETER
+        );
+        assert_eq!(
+            PathBuilder::new()
+                .gcp_operation(GcpOperation::GetParameter)
+                .project("test-project")
+                .location("us-central1")
+                .parameter("test-parameter")
+                .build_route()
+                .unwrap(),
+            routes::parameter_manager::PARAMETER
+        );
+        assert_eq!(
+            PathBuilder::new()
+                .gcp_operation(GcpOperation::ListParameterVersions)
+                .project("test-project")
+                .location("us-central1")
+                .parameter("test-parameter")
+                .build_route()
+                .unwrap(),
+            routes::parameter_manager::PARAMETER_VERSIONS
+        );
+        assert_eq!(
+            PathBuilder::new()
+                .gcp_operation(GcpOperation::GetParameterVersion)
+                .project("test-project")
+                .location("us-central1")
+                .parameter("test-parameter")
+                .version("123")
+                .build_route()
+                .unwrap(),
+            routes::parameter_manager::PARAMETER_VERSION
+        );
     }
 
     #[test]
     fn validate_location_routes() {
-        // Validate LOCATION route
-        let route = PathBuilder::new()
-            .gcp_operation(GcpOperation::GetLocation)
-            .project("test-project")
-            .location("us-central1")
-            .build_route()
-            .unwrap();
-        assert_eq!(route, routes::locations::LOCATION);
-
-        // Validate LIST_LOCATIONS route
-        let route = PathBuilder::new()
-            .gcp_operation(GcpOperation::ListLocations)
-            .project("test-project")
-            .build_route()
-            .unwrap();
-        assert_eq!(route, routes::locations::LIST_LOCATIONS);
+        assert_eq!(
+            PathBuilder::new()
+                .gcp_operation(GcpOperation::GetLocation)
+                .project("test-project")
+                .location("us-central1")
+                .build_route()
+                .unwrap(),
+            routes::locations::LOCATION
+        );
+        assert_eq!(
+            PathBuilder::new()
+                .gcp_operation(GcpOperation::ListLocations)
+                .project("test-project")
+                .build_route()
+                .unwrap(),
+            routes::locations::LIST_LOCATIONS
+        );
     }
 }

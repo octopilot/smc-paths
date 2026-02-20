@@ -1,47 +1,51 @@
-//! PathBuilder implementation
+//! PathBuilder — type-safe builder for constructing API paths.
 //!
-//! Provides a type-safe builder pattern for constructing API paths
-//! with different output formats for different consumers.
+//! Internally the builder stores typed parameters ([`ProjectId`], [`SecretName`],
+//! etc.) and delegates to the provider-specific path functions that return
+//! [`TypedPath`].  This eliminates the previous `str::replace` approach that
+//! caused substring collisions (e.g. `"proj"` inside `"projects"`).
+//!
+//! # Example
+//!
+//! ```rust
+//! use smc_paths::prelude::*;
+//!
+//! let path = PathBuilder::new()
+//!     .gcp_operation(GcpOperation::CreateSecret)
+//!     .project("my-project")
+//!     .build_http_path();
+//! // Returns: Ok("projects/my-project/secrets")
+//! ```
 
 use crate::errors::PathBuilderError;
 use crate::formats::PathFormat;
 use crate::gcp;
 use crate::operations::{AwsOperation, AzureOperation, GcpOperation, Operation};
+use crate::parameters::{LocationId, ParameterName, ProjectId, SecretName, VersionId, VaultName};
 use crate::provider::Provider;
 
-/// Builder for constructing API paths with type safety
-///
-/// # Example
-///
-/// ```rust
-/// use smc_paths::prelude::*;
-///
-/// let path = PathBuilder::new()
-///     .gcp_operation(GcpOperation::CreateSecret)
-///     .project("my-project")
-///     .build_http_path();
-/// // Returns: "projects/my-project/secrets"
-/// ```
+/// Builder for constructing API paths with type safety.
 #[derive(Debug, Clone)]
 pub struct PathBuilder {
     provider: Option<Provider>,
     operation: Option<Operation>,
 
     // GCP parameters
-    project: Option<String>,
-    location: Option<String>,
-    secret: Option<String>,
-    parameter: Option<String>,
-    version: Option<String>,
+    project: Option<ProjectId>,
+    location: Option<LocationId>,
+    secret: Option<SecretName>,
+    parameter: Option<ParameterName>,
+    version: Option<VersionId>,
 
-    // AWS parameters
-    region: Option<String>,
+    // AWS parameters (reserved for future use)
+    #[allow(dead_code)]
+    region: Option<crate::parameters::RegionId>,
 
     // Azure parameters
-    vault_name: Option<String>,
+    vault_name: Option<VaultName>,
 
-    // Common
-    use_trailing_slash: bool, // For Azure
+    /// Azure trailing-slash toggle (GET /secrets/{name}/ vs PUT /secrets/{name}).
+    use_trailing_slash: bool,
 }
 
 impl Default for PathBuilder {
@@ -51,7 +55,8 @@ impl Default for PathBuilder {
 }
 
 impl PathBuilder {
-    /// Create a new PathBuilder
+    /// Create a new, empty [`PathBuilder`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             provider: None,
@@ -67,104 +72,133 @@ impl PathBuilder {
         }
     }
 
-    // Provider selection
+    // ── Provider / operation setters ──────────────────────────────────────────
+
+    /// Set the cloud provider explicitly.
+    #[must_use]
     pub fn provider(mut self, provider: Provider) -> Self {
         self.provider = Some(provider);
         self
     }
 
-    // Operation selection
+    /// Set an operation (and auto-derive the provider).
+    #[must_use]
     pub fn operation(mut self, operation: Operation) -> Self {
         self.operation = Some(operation);
-        // Auto-set provider from operation
-        match operation {
-            Operation::Gcp(_) => self.provider = Some(Provider::Gcp),
-            Operation::Aws(_) => self.provider = Some(Provider::Aws),
-            Operation::Azure(_) => self.provider = Some(Provider::Azure),
-        }
+        self.provider = Some(match operation {
+            Operation::Gcp(_) => Provider::Gcp,
+            Operation::Aws(_) => Provider::Aws,
+            Operation::Azure(_) => Provider::Azure,
+        });
         self
     }
 
-    // Convenience methods for provider-specific operations
+    /// Convenience: set a GCP operation (also sets provider to GCP).
+    #[must_use]
     pub fn gcp_operation(mut self, operation: GcpOperation) -> Self {
         self.provider = Some(Provider::Gcp);
         self.operation = Some(Operation::Gcp(operation));
         self
     }
 
+    /// Convenience: set an AWS operation (also sets provider to AWS).
+    #[must_use]
     pub fn aws_operation(mut self, operation: AwsOperation) -> Self {
         self.provider = Some(Provider::Aws);
         self.operation = Some(Operation::Aws(operation));
         self
     }
 
+    /// Convenience: set an Azure operation (also sets provider to Azure).
+    #[must_use]
     pub fn azure_operation(mut self, operation: AzureOperation) -> Self {
         self.provider = Some(Provider::Azure);
         self.operation = Some(Operation::Azure(operation));
         self
     }
 
-    // GCP parameters
+    // ── Parameter setters ─────────────────────────────────────────────────────
+
+    /// Set the GCP project ID.
+    #[must_use]
     pub fn project(mut self, project: impl Into<String>) -> Self {
-        self.project = Some(project.into());
+        self.project = Some(ProjectId::new(project));
         self
     }
 
+    /// Set the GCP location / region.
+    #[must_use]
     pub fn location(mut self, location: impl Into<String>) -> Self {
-        self.location = Some(location.into());
+        self.location = Some(LocationId::new(location));
         self
     }
 
+    /// Set the secret name.
+    #[must_use]
     pub fn secret(mut self, secret: impl Into<String>) -> Self {
-        self.secret = Some(secret.into());
+        self.secret = Some(SecretName::new(secret));
         self
     }
 
+    /// Set the parameter name (GCP Parameter Manager).
+    #[must_use]
     pub fn parameter(mut self, parameter: impl Into<String>) -> Self {
-        self.parameter = Some(parameter.into());
+        self.parameter = Some(ParameterName::new(parameter));
         self
     }
 
+    /// Set the version identifier.
+    #[must_use]
     pub fn version(mut self, version: impl Into<String>) -> Self {
-        self.version = Some(version.into());
+        self.version = Some(VersionId::new(version));
         self
     }
 
-    // AWS parameters
+    /// Set the AWS region (reserved for future path functions).
+    #[must_use]
     pub fn region(mut self, region: impl Into<String>) -> Self {
-        self.region = Some(region.into());
+        self.region = Some(crate::parameters::RegionId::new(region));
         self
     }
 
-    // Azure parameters
+    /// Set the Azure Key Vault name.
+    #[must_use]
     pub fn vault_name(mut self, vault_name: impl Into<String>) -> Self {
-        self.vault_name = Some(vault_name.into());
+        self.vault_name = Some(VaultName::new(vault_name));
         self
     }
 
+    /// Enable / disable trailing slash for Azure `GetSecret` paths.
+    #[must_use]
     pub fn with_trailing_slash(mut self, enabled: bool) -> Self {
         self.use_trailing_slash = enabled;
         self
     }
 
-    // Build methods
+    // ── Build methods ──────────────────────────────────────────────────────────
+
+    /// Build as an Axum route pattern with `{placeholder}` markers.
     pub fn build_route(&self) -> Result<String, PathBuilderError> {
         self.build(PathFormat::Route)
     }
 
+    /// Build as a concrete HTTP path (no `/v1/` prefix).
     pub fn build_http_path(&self) -> Result<String, PathBuilderError> {
         self.build(PathFormat::HttpPath)
     }
 
+    /// Build as a response name (same as `HttpPath`).
     pub fn build_response_name(&self) -> Result<String, PathBuilderError> {
         self.build(PathFormat::ResponseName)
     }
 
+    /// Build as a Pact contract path (with `/v1/` prefix).
     pub fn build_pact_path(&self) -> Result<String, PathBuilderError> {
         self.build(PathFormat::PactPath)
     }
 
-    // AWS-specific
+    /// Return the `x-amz-target` header value for the current AWS operation,
+    /// or `None` if the operation does not use a target header.
     pub fn build_aws_header(&self) -> Result<Option<String>, PathBuilderError> {
         self.validate_provider_operation()?;
 
@@ -180,7 +214,9 @@ impl PathBuilder {
                     AwsOperation::DeleteSecret => Some(secrets_manager::DELETE_SECRET),
                     AwsOperation::RestoreSecret => Some(secrets_manager::RESTORE_SECRET),
                     AwsOperation::ListSecrets => Some(secrets_manager::LIST_SECRETS),
-                    AwsOperation::ListSecretVersions => Some(secrets_manager::LIST_SECRET_VERSIONS),
+                    AwsOperation::ListSecretVersions => {
+                        Some(secrets_manager::LIST_SECRET_VERSIONS)
+                    }
                     AwsOperation::UpdateSecretVersionStage => {
                         Some(secrets_manager::UPDATE_SECRET_VERSION_STAGE)
                     }
@@ -189,401 +225,187 @@ impl PathBuilder {
                     AwsOperation::GetResourcePolicy => Some(secrets_manager::GET_RESOURCE_POLICY),
                     _ => None,
                 };
-                Ok(header.map(|s| s.to_string()))
+                Ok(header.map(std::string::ToString::to_string))
             }
             _ => Ok(None),
         }
     }
 
-    // Generic build with format
+    /// Build the path in the requested output format.
     pub fn build(&self, format: PathFormat) -> Result<String, PathBuilderError> {
         self.validate_provider_operation()?;
 
         match self.operation {
-            Some(Operation::Gcp(op)) => self.build_gcp_path(op, format),
-            Some(Operation::Aws(op)) => self.build_aws_path(op, format),
-            Some(Operation::Azure(op)) => self.build_azure_path(op, format),
+            Some(Operation::Gcp(op)) => Ok(self.build_gcp(op)?.build(format)),
+            Some(Operation::Aws(op)) => self.build_aws(op, format),
+            Some(Operation::Azure(op)) => Ok(self.build_azure(op)?.build(format)),
             None => Err(PathBuilderError::MissingRequiredParameter(
                 "operation".to_string(),
             )),
         }
     }
 
-    // Validation: Ensure provider matches operation
+    // ── Validation ────────────────────────────────────────────────────────────
+
     fn validate_provider_operation(&self) -> Result<(), PathBuilderError> {
         match (&self.provider, &self.operation) {
-            (Some(Provider::Gcp), Some(Operation::Gcp(_))) => Ok(()),
-            (Some(Provider::Aws), Some(Operation::Aws(_))) => Ok(()),
-            (Some(Provider::Azure), Some(Operation::Azure(_))) => Ok(()),
+            (Some(Provider::Gcp), Some(Operation::Gcp(_)))
+            | (Some(Provider::Aws), Some(Operation::Aws(_)))
+            | (Some(Provider::Azure), Some(Operation::Azure(_))) => Ok(()),
             (Some(_), Some(_)) => Err(PathBuilderError::ProviderOperationMismatch),
-            (None, Some(_)) => Ok(()), // Provider will be auto-set from operation
-            (Some(_), None) => Err(PathBuilderError::MissingRequiredParameter(
-                "operation".to_string(),
-            )),
-            (None, None) => Err(PathBuilderError::MissingRequiredParameter(
+            (None, Some(_)) => Ok(()), // provider auto-set from operation
+            (_, None) => Err(PathBuilderError::MissingRequiredParameter(
                 "operation".to_string(),
             )),
         }
     }
 
-    // GCP path building
-    fn build_gcp_path(
+    // ── Provider-specific builders ─────────────────────────────────────────────
+
+    fn req_project(&self) -> Result<&ProjectId, PathBuilderError> {
+        self.project
+            .as_ref()
+            .ok_or_else(|| PathBuilderError::MissingRequiredParameter("project".into()))
+    }
+
+    fn req_secret(&self) -> Result<&SecretName, PathBuilderError> {
+        self.secret
+            .as_ref()
+            .ok_or_else(|| PathBuilderError::MissingRequiredParameter("secret".into()))
+    }
+
+    fn req_version(&self) -> Result<&VersionId, PathBuilderError> {
+        self.version
+            .as_ref()
+            .ok_or_else(|| PathBuilderError::MissingRequiredParameter("version".into()))
+    }
+
+    fn req_location(&self) -> Result<&LocationId, PathBuilderError> {
+        self.location
+            .as_ref()
+            .ok_or_else(|| PathBuilderError::MissingRequiredParameter("location".into()))
+    }
+
+    fn req_parameter(&self) -> Result<&ParameterName, PathBuilderError> {
+        self.parameter
+            .as_ref()
+            .ok_or_else(|| PathBuilderError::MissingRequiredParameter("parameter".into()))
+    }
+
+    fn build_gcp(
         &self,
         op: GcpOperation,
-        format: PathFormat,
-    ) -> Result<String, PathBuilderError> {
-        let project = self
-            .project
-            .as_deref()
-            .ok_or_else(|| PathBuilderError::MissingRequiredParameter("project".to_string()))?;
+    ) -> Result<crate::typed_path::TypedPath, PathBuilderError> {
+        use gcp::{parameter_manager as pm, secret_manager as sm};
+        let proj = self.req_project()?;
 
-        match op {
-            GcpOperation::CreateSecret | GcpOperation::ListSecrets => {
-                let path = gcp::secret_manager::create_secret(project);
-                Ok(self.format_path(path, format))
-            }
+        Ok(match op {
+            GcpOperation::CreateSecret | GcpOperation::ListSecrets => sm::create_secret(proj),
             GcpOperation::GetSecret | GcpOperation::UpdateSecret | GcpOperation::DeleteSecret => {
-                let secret = self.secret.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("secret".to_string())
-                })?;
-                let path = gcp::secret_manager::get_secret_metadata(project, secret);
-                Ok(self.format_path(path, format))
+                sm::get_secret_metadata(proj, self.req_secret()?)
             }
-            GcpOperation::AddVersion => {
-                let secret = self.secret.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("secret".to_string())
-                })?;
-                let path = gcp::secret_manager::add_version(project, secret);
-                Ok(self.format_path(path, format))
-            }
+            GcpOperation::AddVersion => sm::add_version(proj, self.req_secret()?),
+            GcpOperation::EnableSecret => sm::enable_secret(proj, self.req_secret()?),
+            GcpOperation::DisableSecret => sm::disable_secret(proj, self.req_secret()?),
+            GcpOperation::ListVersions => sm::list_versions(proj, self.req_secret()?),
             GcpOperation::GetVersion
             | GcpOperation::EnableVersion
             | GcpOperation::DisableVersion => {
-                let secret = self.secret.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("secret".to_string())
-                })?;
-                let version = self.version.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("version".to_string())
-                })?;
-                let path = gcp::secret_manager::get_version(project, secret, version);
-                Ok(self.format_path(path, format))
-            }
-            GcpOperation::ListVersions => {
-                let secret = self.secret.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("secret".to_string())
-                })?;
-                let path = gcp::secret_manager::list_versions(project, secret);
-                Ok(self.format_path(path, format))
-            }
-            GcpOperation::EnableSecret | GcpOperation::DisableSecret => {
-                let secret = self.secret.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("secret".to_string())
-                })?;
-                let path = match op {
-                    GcpOperation::EnableSecret => {
-                        gcp::secret_manager::enable_secret(project, secret)
-                    }
-                    GcpOperation::DisableSecret => {
-                        gcp::secret_manager::disable_secret(project, secret)
-                    }
-                    _ => unreachable!(),
-                };
-                Ok(self.format_path(path, format))
+                sm::get_version(proj, self.req_secret()?, self.req_version()?)
             }
             GcpOperation::AccessVersion => {
-                let secret = self.secret.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("secret".to_string())
-                })?;
-                let version = self.version.as_deref().unwrap_or("latest");
-                let path = gcp::secret_manager::access_version(project, secret, version);
-                Ok(self.format_path(path, format))
+                sm::access_version(proj, self.req_secret()?, self.req_version()?)
             }
-            // Parameter Manager operations
             GcpOperation::CreateParameter | GcpOperation::ListParameters => {
-                let location = self.location.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("location".to_string())
-                })?;
-                let path = gcp::parameter_manager::create_parameter(project, location);
-                Ok(self.format_path(path, format))
+                pm::create_parameter(proj, self.req_location()?)
             }
             GcpOperation::GetParameter
             | GcpOperation::UpdateParameter
             | GcpOperation::DeleteParameter => {
-                let location = self.location.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("location".to_string())
-                })?;
-                let parameter = self.parameter.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("parameter".to_string())
-                })?;
-                let path = gcp::parameter_manager::get_parameter(project, location, parameter);
-                Ok(self.format_path(path, format))
+                pm::get_parameter(proj, self.req_location()?, self.req_parameter()?)
             }
             GcpOperation::CreateParameterVersion | GcpOperation::ListParameterVersions => {
-                let location = self.location.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("location".to_string())
-                })?;
-                let parameter = self.parameter.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("parameter".to_string())
-                })?;
-                let path = gcp::parameter_manager::create_version(project, location, parameter);
-                Ok(self.format_path(path, format))
+                pm::create_version(proj, self.req_location()?, self.req_parameter()?)
             }
             GcpOperation::GetParameterVersion
             | GcpOperation::UpdateParameterVersion
             | GcpOperation::DeleteParameterVersion => {
-                let location = self.location.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("location".to_string())
-                })?;
-                let parameter = self.parameter.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("parameter".to_string())
-                })?;
-                let version = self.version.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("version".to_string())
-                })?;
-                let path =
-                    gcp::parameter_manager::get_version(project, location, parameter, version);
-                Ok(self.format_path(path, format))
+                pm::get_version(proj, self.req_location()?, self.req_parameter()?, self.req_version()?)
             }
             GcpOperation::RenderParameterVersion => {
-                let location = self.location.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("location".to_string())
-                })?;
-                let parameter = self.parameter.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("parameter".to_string())
-                })?;
-                let version = self.version.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("version".to_string())
-                })?;
-                let path =
-                    gcp::parameter_manager::render_version(project, location, parameter, version);
-                Ok(self.format_path(path, format))
+                pm::render_version(proj, self.req_location()?, self.req_parameter()?, self.req_version()?)
             }
-            // Location operations
-            GcpOperation::GetLocation => {
-                let location = self.location.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("location".to_string())
-                })?;
-                let path = gcp::parameter_manager::get_location(project, location);
-                Ok(self.format_path(path, format))
-            }
-            GcpOperation::ListLocations => {
-                let path = gcp::parameter_manager::list_locations(project);
-                Ok(self.format_path(path, format))
-            }
-        }
+            GcpOperation::GetLocation => pm::get_location(proj, self.req_location()?),
+            GcpOperation::ListLocations => pm::list_locations(proj),
+        })
     }
 
-    // AWS path building
-    fn build_aws_path(
+    fn build_aws(
         &self,
         _op: AwsOperation,
         format: PathFormat,
     ) -> Result<String, PathBuilderError> {
-        // AWS uses a single POST endpoint "/" with x-amz-target header
+        // AWS uses a single POST endpoint `/` with an `x-amz-target` header.
         match format {
             PathFormat::Route | PathFormat::HttpPath | PathFormat::PactPath => Ok("/".to_string()),
             PathFormat::ResponseName => Err(PathBuilderError::InvalidFormatForOperation),
         }
     }
 
-    // Azure path building
-    fn build_azure_path(
+    fn build_azure(
         &self,
         op: AzureOperation,
-        format: PathFormat,
-    ) -> Result<String, PathBuilderError> {
-        use crate::azure::key_vault as kv;
+    ) -> Result<crate::typed_path::TypedPath, PathBuilderError> {
+        use crate::azure::{app_configuration as ac, key_vault as kv};
 
-        match op {
+        Ok(match op {
             AzureOperation::ListSecrets => {
-                let path = kv::LIST_SECRETS.to_string();
-                Ok(self.format_azure_path(path, format))
+                crate::typed_path::TypedPath::new(kv::LIST_SECRETS)
             }
             AzureOperation::GetSecret => {
-                let name = self.secret.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("secret".to_string())
-                })?;
-                let path = if self.use_trailing_slash {
+                let name = self.req_secret()?;
+                if self.use_trailing_slash {
                     kv::get_secret(name)
                 } else {
-                    kv::set_secret(name) // Same path, different method
-                };
-                Ok(self.format_azure_path(path, format))
+                    kv::set_secret(name) // same path, no trailing slash
+                }
             }
             AzureOperation::GetSecretVersion => {
-                let name = self.secret.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("secret".to_string())
-                })?;
-                let version = self.version.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("version".to_string())
-                })?;
-                let path = kv::get_secret_version(name, version);
-                Ok(self.format_azure_path(path, format))
+                kv::get_secret_version(self.req_secret()?, self.req_version()?)
             }
-            AzureOperation::ListSecretVersions => {
-                let name = self.secret.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("secret".to_string())
-                })?;
-                let path = kv::list_secret_versions(name);
-                Ok(self.format_azure_path(path, format))
-            }
-            AzureOperation::SetSecret => {
-                let name = self.secret.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("secret".to_string())
-                })?;
-                let path = kv::set_secret(name);
-                Ok(self.format_azure_path(path, format))
-            }
-            AzureOperation::DeleteSecret => {
-                let name = self.secret.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("secret".to_string())
-                })?;
-                let path = kv::delete_secret(name);
-                Ok(self.format_azure_path(path, format))
-            }
-            AzureOperation::UpdateSecret => {
-                let name = self.secret.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("secret".to_string())
-                })?;
-                let path = kv::update_secret(name);
-                Ok(self.format_azure_path(path, format))
-            }
-            AzureOperation::BackupSecret => {
-                let name = self.secret.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("secret".to_string())
-                })?;
-                let path = kv::backup_secret(name);
-                Ok(self.format_azure_path(path, format))
-            }
+            AzureOperation::ListSecretVersions => kv::list_secret_versions(self.req_secret()?),
+            AzureOperation::SetSecret => kv::set_secret(self.req_secret()?),
+            AzureOperation::DeleteSecret => kv::delete_secret(self.req_secret()?),
+            AzureOperation::UpdateSecret => kv::update_secret(self.req_secret()?),
+            AzureOperation::BackupSecret => kv::backup_secret(self.req_secret()?),
             AzureOperation::RestoreSecret => {
-                let path = kv::RESTORE_SECRET.to_string();
-                Ok(self.format_azure_path(path, format))
+                crate::typed_path::TypedPath::new(kv::RESTORE_SECRET)
             }
-            AzureOperation::GetDeletedSecret => {
-                let name = self.secret.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("secret".to_string())
-                })?;
-                let path = kv::get_deleted_secret(name);
-                Ok(self.format_azure_path(path, format))
-            }
+            AzureOperation::GetDeletedSecret => kv::get_deleted_secret(self.req_secret()?),
             AzureOperation::ListDeletedSecrets => {
-                let path = kv::LIST_DELETED_SECRETS.to_string();
-                Ok(self.format_azure_path(path, format))
+                crate::typed_path::TypedPath::new(kv::LIST_DELETED_SECRETS)
             }
             AzureOperation::RecoverDeletedSecret => {
-                let name = self.secret.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("secret".to_string())
-                })?;
-                let path = kv::recover_deleted_secret(name);
-                Ok(self.format_azure_path(path, format))
+                kv::recover_deleted_secret(self.req_secret()?)
             }
-            AzureOperation::PurgeDeletedSecret => {
-                let name = self.secret.as_deref().ok_or_else(|| {
-                    PathBuilderError::MissingRequiredParameter("secret".to_string())
-                })?;
-                let path = kv::purge_deleted_secret(name);
-                Ok(self.format_azure_path(path, format))
-            }
-            // App Configuration operations
+            AzureOperation::PurgeDeletedSecret => kv::purge_deleted_secret(self.req_secret()?),
             AzureOperation::GetKeyValue
             | AzureOperation::SetKeyValue
             | AzureOperation::DeleteKeyValue => {
-                use crate::azure::app_configuration as ac;
                 let key = self
                     .secret
-                    .as_deref()
-                    .ok_or_else(|| PathBuilderError::MissingRequiredParameter("key".to_string()))?;
-                let path = match op {
+                    .as_ref()
+                    .ok_or_else(|| PathBuilderError::MissingRequiredParameter("key".into()))?;
+                match op {
                     AzureOperation::GetKeyValue => ac::get_key_value(key),
                     AzureOperation::SetKeyValue => ac::set_key_value(key),
                     AzureOperation::DeleteKeyValue => ac::delete_key_value(key),
                     _ => unreachable!(),
-                };
-                Ok(self.format_azure_path(path, format))
+                }
             }
             AzureOperation::ListKeyValues => {
-                use crate::azure::app_configuration as ac;
-                let path = ac::LIST_KEY_VALUES.to_string();
-                Ok(self.format_azure_path(path, format))
+                crate::typed_path::TypedPath::new(ac::LIST_KEY_VALUES)
             }
-        }
-    }
-
-    // Format Azure path based on output format
-    fn format_azure_path(&self, path: String, format: PathFormat) -> String {
-        match format {
-            PathFormat::Route => {
-                // Replace actual values with placeholders for route patterns
-                let mut route = path;
-
-                // Replace secret/name if present
-                if let Some(secret) = &self.secret {
-                    route = route.replace(secret, "{name}");
-                }
-
-                // Replace version if present
-                if let Some(version) = &self.version {
-                    route = route.replace(version, "{version}");
-                }
-
-                route
-            }
-            PathFormat::HttpPath => {
-                // Remove /v1/ prefix if present - make_request will add it
-                path.strip_prefix("/v1/").unwrap_or(&path).to_string()
-            }
-            PathFormat::ResponseName => {
-                // Azure doesn't use response names like GCP, return as-is
-                path
-            }
-            PathFormat::PactPath => path,
-        }
-    }
-
-    // Format path based on output format
-    fn format_path(&self, path: String, format: PathFormat) -> String {
-        match format {
-            PathFormat::Route => {
-                // Replace actual values with placeholders for route patterns
-                // We need to replace in reverse order (longer strings first) to avoid partial replacements
-                let mut route = path;
-
-                // Replace version first (longest, most specific)
-                if let Some(version) = &self.version {
-                    route = route.replace(version, "{version}");
-                }
-
-                // Replace parameter
-                if let Some(parameter) = &self.parameter {
-                    route = route.replace(parameter, "{parameter}");
-                }
-
-                // Replace location
-                if let Some(location) = &self.location {
-                    route = route.replace(location, "{location}");
-                }
-
-                // Replace secret
-                if let Some(secret) = &self.secret {
-                    route = route.replace(secret, "{secret}");
-                }
-
-                // Replace project last (shortest, most common)
-                if let Some(project) = &self.project {
-                    route = route.replace(project, "{project}");
-                }
-
-                route
-            }
-            PathFormat::HttpPath => {
-                // Remove /v1/ prefix if present - make_request will add it
-                path.strip_prefix("/v1/").unwrap_or(&path).to_string()
-            }
-            PathFormat::ResponseName => {
-                // Remove /v1/ prefix if present
-                path.strip_prefix("/v1/").unwrap_or(&path).to_string()
-            }
-            PathFormat::PactPath => path,
-        }
+        })
     }
 }

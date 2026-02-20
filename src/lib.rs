@@ -29,6 +29,8 @@
 pub mod aws;
 pub mod azure;
 pub mod gcp;
+pub mod parameters;
+pub mod typed_path;
 
 #[cfg(test)]
 mod tests;

@@ -27,9 +27,15 @@
 pub use crate::builder::PathBuilder;
 pub use crate::errors::PathBuilderError;
 pub use crate::formats::PathFormat;
+pub use crate::typed_path::TypedPath;
 
 // Operation types - most commonly used together with PathBuilder
 pub use crate::operations::{AwsOperation, AzureOperation, GcpOperation, Operation};
 
 // Provider enum
 pub use crate::provider::Provider;
+
+// Typed path parameters — import to prevent accidental argument swaps
+pub use crate::parameters::{
+    LocationId, ParameterName, ProjectId, RegionId, SecretName, VaultName, VersionId,
+};
