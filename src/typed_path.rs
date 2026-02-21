@@ -175,8 +175,7 @@ mod tests {
     fn no_substring_collision_between_value_and_keyword() {
         // Previously, project="proj" would corrupt the literal "projects" in the path.
         // TypedPath substitutes {project} exactly, never touching surrounding text.
-        let path = TypedPath::new("/v1/projects/{project}/secrets")
-            .bind("project", "proj"); // "proj" is a substring of "projects"
+        let path = TypedPath::new("/v1/projects/{project}/secrets").bind("project", "proj"); // "proj" is a substring of "projects"
 
         // Route should still have the placeholder, not a corrupted literal.
         assert_eq!(
@@ -188,10 +187,7 @@ mod tests {
             path.build(PathFormat::PactPath),
             "/v1/projects/proj/secrets"
         );
-        assert_eq!(
-            path.build(PathFormat::HttpPath),
-            "projects/proj/secrets"
-        );
+        assert_eq!(path.build(PathFormat::HttpPath), "projects/proj/secrets");
     }
 
     #[test]

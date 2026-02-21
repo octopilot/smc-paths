@@ -69,11 +69,7 @@ pub mod secret_manager {
     }
 
     /// `GET /v1/projects/{project}/secrets/{secret}/versions/{version}`
-    pub fn get_version(
-        project: &ProjectId,
-        secret: &SecretName,
-        version: &VersionId,
-    ) -> TypedPath {
+    pub fn get_version(project: &ProjectId, secret: &SecretName, version: &VersionId) -> TypedPath {
         TypedPath::new("/v1/projects/{project}/secrets/{secret}/versions/{version}")
             .bind("project", project.as_str())
             .bind("secret", secret.as_str())
@@ -218,11 +214,13 @@ pub mod parameter_manager {
         parameter: &ParameterName,
         version: &VersionId,
     ) -> TypedPath {
-        TypedPath::new("/v1/projects/{project}/locations/{location}/parameters/{parameter}/versions/{version}")
-            .bind("project",   project.as_str())
-            .bind("location",  location.as_str())
-            .bind("parameter", parameter.as_str())
-            .bind("version",   version.as_str())
+        TypedPath::new(
+            "/v1/projects/{project}/locations/{location}/parameters/{parameter}/versions/{version}",
+        )
+        .bind("project", project.as_str())
+        .bind("location", location.as_str())
+        .bind("parameter", parameter.as_str())
+        .bind("version", version.as_str())
     }
 
     /// `PATCH /v1/…/parameters/{parameter}/versions/{version}`
@@ -282,8 +280,7 @@ pub mod routes {
             "/v1/projects/{project}/secrets/{secret}/versions/{version}";
     }
     pub mod parameter_manager {
-        pub const CREATE_PARAMETER: &str =
-            "/v1/projects/{project}/locations/{location}/parameters";
+        pub const CREATE_PARAMETER: &str = "/v1/projects/{project}/locations/{location}/parameters";
         pub const PARAMETER: &str =
             "/v1/projects/{project}/locations/{location}/parameters/{parameter}";
         pub const PARAMETER_VERSIONS: &str =

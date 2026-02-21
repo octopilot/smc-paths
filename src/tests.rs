@@ -77,7 +77,6 @@ mod errors {
 #[cfg(test)]
 mod builder_gcp {
     use crate::errors::PathBuilderError;
-    use crate::formats::PathFormat;
     use crate::operations::GcpOperation;
     use crate::prelude::*;
 
@@ -444,10 +443,7 @@ mod builder_aws {
                         .aws_operation($op)
                         .build_http_path()
                         .unwrap(),
-                    PathBuilder::new()
-                        .aws_operation($op)
-                        .build_route()
-                        .unwrap(),
+                    PathBuilder::new().aws_operation($op).build_route().unwrap(),
                     PathBuilder::new()
                         .aws_operation($op)
                         .build_pact_path()
@@ -459,7 +455,10 @@ mod builder_aws {
         };
     }
 
-    aws_path_test!(aws_create_secret_uses_root_endpoint, AwsOperation::CreateSecret);
+    aws_path_test!(
+        aws_create_secret_uses_root_endpoint,
+        AwsOperation::CreateSecret
+    );
     aws_path_test!(
         aws_get_secret_value_uses_root_endpoint,
         AwsOperation::GetSecretValue
@@ -472,8 +471,14 @@ mod builder_aws {
         aws_put_secret_value_uses_root_endpoint,
         AwsOperation::PutSecretValue
     );
-    aws_path_test!(aws_update_secret_uses_root_endpoint, AwsOperation::UpdateSecret);
-    aws_path_test!(aws_delete_secret_uses_root_endpoint, AwsOperation::DeleteSecret);
+    aws_path_test!(
+        aws_update_secret_uses_root_endpoint,
+        AwsOperation::UpdateSecret
+    );
+    aws_path_test!(
+        aws_delete_secret_uses_root_endpoint,
+        AwsOperation::DeleteSecret
+    );
     aws_path_test!(
         aws_list_secrets_uses_root_endpoint,
         AwsOperation::ListSecrets
@@ -655,8 +660,10 @@ mod builder_azure {
             .build_route()
             .unwrap();
         // Route should replace the actual name with a placeholder
-        assert!(path.contains("{name}") || !path.contains("my-secret"),
-            "Route format should use placeholder, got: {path}");
+        assert!(
+            path.contains("{name}") || !path.contains("my-secret"),
+            "Route format should use placeholder, got: {path}"
+        );
     }
 
     #[test]
@@ -1047,11 +1054,21 @@ mod gcp_functions {
     use crate::gcp::{parameter_manager, secret_manager};
     use crate::parameters::{LocationId, ParameterName, ProjectId, SecretName, VersionId};
 
-    fn p(s: &str) -> ProjectId { ProjectId::new(s) }
-    fn s(s: &str) -> SecretName { SecretName::new(s) }
-    fn v(s: &str) -> VersionId { VersionId::new(s) }
-    fn l(s: &str) -> LocationId { LocationId::new(s) }
-    fn param(s: &str) -> ParameterName { ParameterName::new(s) }
+    fn p(s: &str) -> ProjectId {
+        ProjectId::new(s)
+    }
+    fn s(s: &str) -> SecretName {
+        SecretName::new(s)
+    }
+    fn v(s: &str) -> VersionId {
+        VersionId::new(s)
+    }
+    fn l(s: &str) -> LocationId {
+        LocationId::new(s)
+    }
+    fn param(s: &str) -> ParameterName {
+        ParameterName::new(s)
+    }
 
     #[test]
     fn create_secret_path() {
@@ -1061,7 +1078,8 @@ mod gcp_functions {
 
     #[test]
     fn get_secret_metadata_path() {
-        let path = secret_manager::get_secret_metadata(&p("proj"), &s("my-secret")).build_pact_path();
+        let path =
+            secret_manager::get_secret_metadata(&p("proj"), &s("my-secret")).build_pact_path();
         assert_eq!(path, "/v1/projects/proj/secrets/my-secret");
     }
 
@@ -1080,14 +1098,16 @@ mod gcp_functions {
 
     #[test]
     fn get_version_path() {
-        let path = secret_manager::get_version(&p("proj"), &s("mysecret"), &v("3")).build_pact_path();
+        let path =
+            secret_manager::get_version(&p("proj"), &s("mysecret"), &v("3")).build_pact_path();
         assert!(path.ends_with("/3"), "got: {path}");
         assert!(path.contains("versions"));
     }
 
     #[test]
     fn access_latest_version_path() {
-        let path = secret_manager::access_latest_version(&p("proj"), &s("mysecret")).build_pact_path();
+        let path =
+            secret_manager::access_latest_version(&p("proj"), &s("mysecret")).build_pact_path();
         assert!(path.contains("latest") && path.contains(":access"));
     }
 
@@ -1117,14 +1137,24 @@ mod gcp_functions {
 
     #[test]
     fn get_parameter_path() {
-        let path = parameter_manager::get_parameter(&p("proj"), &l("us-east1"), &param("my-param")).build_pact_path();
+        let path = parameter_manager::get_parameter(&p("proj"), &l("us-east1"), &param("my-param"))
+            .build_pact_path();
         assert!(path.contains("my-param") && path.contains("us-east1"));
     }
 
     #[test]
     fn render_version_path() {
-        let path = parameter_manager::render_version(&p("proj"), &l("us-central1"), &param("par"), &v("v1")).build_pact_path();
-        assert!(path.contains(":render") || path.contains("render"), "got: {path}");
+        let path = parameter_manager::render_version(
+            &p("proj"),
+            &l("us-central1"),
+            &param("par"),
+            &v("v1"),
+        )
+        .build_pact_path();
+        assert!(
+            path.contains(":render") || path.contains("render"),
+            "got: {path}"
+        );
         assert!(path.contains("v1"));
     }
 
@@ -1154,10 +1184,16 @@ mod azure_functions {
     use crate::azure::{app_configuration as ac, key_vault as kv};
     use crate::parameters::{SecretName, VersionId};
 
-    fn n(s: &str) -> SecretName { SecretName::new(s) }
-    fn ver(s: &str) -> VersionId { VersionId::new(s) }
+    fn n(s: &str) -> SecretName {
+        SecretName::new(s)
+    }
+    fn ver(s: &str) -> VersionId {
+        VersionId::new(s)
+    }
 
-    fn pact(p: crate::typed_path::TypedPath) -> String { p.build_pact_path() }
+    fn pact(p: crate::typed_path::TypedPath) -> String {
+        p.build_pact_path()
+    }
 
     #[test]
     fn kv_get_secret_path() {

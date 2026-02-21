@@ -21,7 +21,7 @@ use crate::errors::PathBuilderError;
 use crate::formats::PathFormat;
 use crate::gcp;
 use crate::operations::{AwsOperation, AzureOperation, GcpOperation, Operation};
-use crate::parameters::{LocationId, ParameterName, ProjectId, SecretName, VersionId, VaultName};
+use crate::parameters::{LocationId, ParameterName, ProjectId, SecretName, VaultName, VersionId};
 use crate::provider::Provider;
 
 /// Builder for constructing API paths with type safety.
@@ -214,9 +214,7 @@ impl PathBuilder {
                     AwsOperation::DeleteSecret => Some(secrets_manager::DELETE_SECRET),
                     AwsOperation::RestoreSecret => Some(secrets_manager::RESTORE_SECRET),
                     AwsOperation::ListSecrets => Some(secrets_manager::LIST_SECRETS),
-                    AwsOperation::ListSecretVersions => {
-                        Some(secrets_manager::LIST_SECRET_VERSIONS)
-                    }
+                    AwsOperation::ListSecretVersions => Some(secrets_manager::LIST_SECRET_VERSIONS),
                     AwsOperation::UpdateSecretVersionStage => {
                         Some(secrets_manager::UPDATE_SECRET_VERSION_STAGE)
                     }
@@ -329,22 +327,24 @@ impl PathBuilder {
             }
             GcpOperation::GetParameterVersion
             | GcpOperation::UpdateParameterVersion
-            | GcpOperation::DeleteParameterVersion => {
-                pm::get_version(proj, self.req_location()?, self.req_parameter()?, self.req_version()?)
-            }
-            GcpOperation::RenderParameterVersion => {
-                pm::render_version(proj, self.req_location()?, self.req_parameter()?, self.req_version()?)
-            }
+            | GcpOperation::DeleteParameterVersion => pm::get_version(
+                proj,
+                self.req_location()?,
+                self.req_parameter()?,
+                self.req_version()?,
+            ),
+            GcpOperation::RenderParameterVersion => pm::render_version(
+                proj,
+                self.req_location()?,
+                self.req_parameter()?,
+                self.req_version()?,
+            ),
             GcpOperation::GetLocation => pm::get_location(proj, self.req_location()?),
             GcpOperation::ListLocations => pm::list_locations(proj),
         })
     }
 
-    fn build_aws(
-        &self,
-        _op: AwsOperation,
-        format: PathFormat,
-    ) -> Result<String, PathBuilderError> {
+    fn build_aws(&self, _op: AwsOperation, format: PathFormat) -> Result<String, PathBuilderError> {
         // AWS uses a single POST endpoint `/` with an `x-amz-target` header.
         match format {
             PathFormat::Route | PathFormat::HttpPath | PathFormat::PactPath => Ok("/".to_string()),
@@ -359,9 +359,7 @@ impl PathBuilder {
         use crate::azure::{app_configuration as ac, key_vault as kv};
 
         Ok(match op {
-            AzureOperation::ListSecrets => {
-                crate::typed_path::TypedPath::new(kv::LIST_SECRETS)
-            }
+            AzureOperation::ListSecrets => crate::typed_path::TypedPath::new(kv::LIST_SECRETS),
             AzureOperation::GetSecret => {
                 let name = self.req_secret()?;
                 if self.use_trailing_slash {
@@ -378,16 +376,12 @@ impl PathBuilder {
             AzureOperation::DeleteSecret => kv::delete_secret(self.req_secret()?),
             AzureOperation::UpdateSecret => kv::update_secret(self.req_secret()?),
             AzureOperation::BackupSecret => kv::backup_secret(self.req_secret()?),
-            AzureOperation::RestoreSecret => {
-                crate::typed_path::TypedPath::new(kv::RESTORE_SECRET)
-            }
+            AzureOperation::RestoreSecret => crate::typed_path::TypedPath::new(kv::RESTORE_SECRET),
             AzureOperation::GetDeletedSecret => kv::get_deleted_secret(self.req_secret()?),
             AzureOperation::ListDeletedSecrets => {
                 crate::typed_path::TypedPath::new(kv::LIST_DELETED_SECRETS)
             }
-            AzureOperation::RecoverDeletedSecret => {
-                kv::recover_deleted_secret(self.req_secret()?)
-            }
+            AzureOperation::RecoverDeletedSecret => kv::recover_deleted_secret(self.req_secret()?),
             AzureOperation::PurgeDeletedSecret => kv::purge_deleted_secret(self.req_secret()?),
             AzureOperation::GetKeyValue
             | AzureOperation::SetKeyValue
@@ -403,9 +397,7 @@ impl PathBuilder {
                     _ => unreachable!(),
                 }
             }
-            AzureOperation::ListKeyValues => {
-                crate::typed_path::TypedPath::new(ac::LIST_KEY_VALUES)
-            }
+            AzureOperation::ListKeyValues => crate::typed_path::TypedPath::new(ac::LIST_KEY_VALUES),
         })
     }
 }
