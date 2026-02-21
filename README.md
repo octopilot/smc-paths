@@ -1,6 +1,9 @@
 # smc-paths
 
+[![CI](https://github.com/octopilot/smc-paths/actions/workflows/ci.yml/badge.svg)](https://github.com/octopilot/smc-paths/actions/workflows/ci.yml)
 [![License: PolyForm Shield 1.0.0](https://img.shields.io/badge/License-PolyForm%20Shield%201.0.0-blue.svg)](https://polyformproject.org/licenses/shield/1.0.0)
+[![Rust edition](https://img.shields.io/badge/edition-2024-orange.svg)](https://doc.rust-lang.org/edition-guide/rust-2024/)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://pre-commit.com/)
 
 Type-safe API path builder for **GCP Secret Manager**, **AWS Secrets Manager**, and **Azure Key Vault**.
 
